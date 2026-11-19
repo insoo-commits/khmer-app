@@ -34,7 +34,10 @@ const subWords=s=>s.b.flatMap(bid=>B[bid].w.map(w=>({bid,w})));
 const knownN=s=>subWords(s).filter(x=>known[kk(x.bid,x.w[0])]).length;
 const curBun=()=>{const s=SUBS[S.sub],b=S.bun[S.sub];return s.b.includes(b)?b:s.b[0]};
 const scopeB=()=>{const b=curBun();return b==="all"?SUBS[S.sub].b:[b]};
-const hl=(text,w)=>{const e=esc(text);if(!w)return e;const i=e.indexOf(esc(w));return i<0?e:e.slice(0,i)+"<mark>"+esc(w)+"</mark>"+e.slice(i+esc(w).length)};
+const hlSyl=(e,i,w)=>{try{if(typeof TN==="undefined")return true;const m=/[\u0E80-\u0EFF]+/g;let r;while((r=m.exec(e))){if(i>=r.index&&i<r.index+r[0].length){const bs=new Set([0]);for(const y of TN.seg(r[0])){bs.add(y.i);bs.add(y.i+y.n)}return bs.has(i-r.index)&&bs.has(i-r.index+w.length)}}}catch(_){}return true};
+const hlBad=(e,i,w)=>{const nx=e[i+w.length]||"",pv=e[i-1]||"";if(!hlSyl(e,i,w))return true;if(/[\u0EB0-\u0EBC\u0EC8-\u0ECD]/.test(nx)||/[\u0EC0-\u0EC4]/.test(pv))return true;for(let L=w.length+1;L<=Math.min(NMAX,e.length-i);L++){const k=e.slice(i,i+L);if(NDICT[k]!==undefined&&!/[\u0EB0-\u0EBC\u0EC8-\u0ECD]/.test(e[i+L]||"")&&e.indexOf(w,i+1)>=0)return true}return false};
+/* v2.28 RYU: underline the headword where it stands as a word (ລາວລາອອກ → 2nd ລາ), not inside a longer word */
+const hl=(text,w)=>{const e=esc(text);if(!w)return e;const ew=esc(w);let i=e.indexOf(ew);for(let j=i;j>=0;j=e.indexOf(ew,j+1)){if(!hlBad(e,j,ew)){i=j;break}}return i<0?e:e.slice(0,i)+"<mark>"+esc(w)+"</mark>"+e.slice(i+esc(w).length)};
 // mark Lao text that contains Korean (tips): wrap Lao runs
 const hintHtml=h=>laoWrap(h).replace(/ · (원래 )/g,'<br>$1');/* v13.12 RYU: 원래 on own line */
 const laoWrap=t=>esc(t).replace(/([\u1780-\u17FF][\u1780-\u17FF\s◌]*)/g,'<span class="lo">$1</span>');
@@ -71,6 +74,11 @@ function showPlayer(){const el=$("#player");if(!P.active){el.hidden=true;documen
   /* RYU v12.58: like kor-app: icon · count · current sentence */
   $("#pt").innerHTML=P.loading?"⏳ 소리 준비 중…":`<span class="pic">${SPK}</span>`+(()=>{try{const c=curBun();return c&&B[c]?`[${c}] `:""}catch(e){return ""}})()+(P.single||P.hold!=null?`∞ · ${P.k+1} · `:cur.rv?`복습 ${cur.ri+1}/${cur.rn} · ↻${(P.rk||0)+1} · `:`${cur.gi+1}/${P.ng} · ↻${P.k+1} · `)+`<span class="lo">${txt}</span>`}
 function ttsWarn(){const n=$("#voiceNote");if(n)n.textContent="소리가 나지 않으면: 아이패드·아이폰의 무음 모드를 끄고 볼륨을 올린 뒤 🔊 버튼을 다시 눌러 주세요."}
+/* v2.33 RYU: only the 반복 button that is playing right now is shown inverted */
+function btnKey(b){const d=b.dataset;if(d.playbundle)return "pb"+(d.chain?"c":"");if(d.sayall){const h=b.closest(".entry");return "sa"+(h&&h.querySelector(".entry-head")?h.querySelector(".entry-head").id:"")}if(d.playsec)return "ps"+((b.closest(".pairs,.dlg")||{}).className||"");if(d.playcards)return "pc";return ""}
+function syncBtn(){const on=P.active&&P._bk;document.querySelectorAll(".speak.all").forEach(b=>b.classList.toggle("act",!!on&&btnKey(b)===P._bk))}
+setInterval(syncBtn,300);
+function nextRow(id){if(!id)return "";const L=PARTS.flatMap(p=>p.subs.flatMap(x=>x.b)),k=L.indexOf(id);if(k<0)return "";const big=(typeof isBig==="function")&&isBig();const lab=x=>{const NL=BLAB[x]||[B[x].t,""];return `[${big?x:x.slice(-2)}] ${esc(NL[0])}`};const pv=L[(k-1+L.length)%L.length],nx=L[(k+1)%L.length];return `<div class="nextrow"><button class="nextbun prevbun" data-next="${pv}"><span class="nbl">← 이전 묶음</span><span class="nbn">${lab(pv)}</span></button><button class="nextbun" data-next="${nx}"><span class="nbl">다음 묶음 →</span><span class="nbn">${lab(nx)}</span></button></div>`}
 function stopPlay(){P.token++;P.active=false;clearTimeout(LT);P.loading=false;P.paused=false;P.hold=null;try{holdMark(null)}catch(e){}if(P.cardKey){const k=P.cardKey;P.cardKey=null;P.lastGi=null;if(S.flipped[k]){delete S.flipped[k];try{render()}catch(e){}}}P._resume=null;try{navigator.mediaSession.playbackState="none"}catch(e){}try{if(AEL)AEL.pause()}catch(e){}try{if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel()}catch(e){}mark(null);showPlayer()}
 function bundleItems(id){const sec=document.getElementById("bd-"+id),items=[];if(!sec){/* 단어공부: word cards of this bundle */return [...document.querySelectorAll(".cards .card")].filter(c=>c.id.startsWith("cd-"+id+"-")).map(c=>{const b=c.querySelector(".card-foot [data-say]");return b&&{text:b.dataset.say,rd:b.dataset.rd,id:c.id}}).filter(Boolean)}
   sec.querySelectorAll(".entry-head,.line").forEach(el=>{if(el.classList.contains("entry-head")){const b=el.querySelector("[data-sayall]");items.push({text:b.dataset.say,rd:b.dataset.rd,id:el.id,head:1})}else items.push(sayItem(el))});
@@ -205,9 +213,10 @@ const tone=(y)=>{const c=cls(y.ini),t=y.t,dead='ກດບ'.includes(y.fin)&&y.fi
   if(t==='່')return c==='L'?'t3':'t5';if(t==='້')return c==='H'?'t6':'t2';
   return {H:'t4',M:'t1',L:'t1'}[c]};
 /* best cover of a word: max chars covered, then fewest syllables */
-const seg=(w)=>{const n=w.length,best=new Array(n+1).fill(null);best[n]={c:0,k:0,p:[]};
-  for(let i=n-1;i>=0;i--){let b={c:best[i+1].c,k:best[i+1].k,p:best[i+1].p};
-    for(const y of at(w.slice(i))){const nx=best[i+y.n];if(!nx)continue;const c=nx.c+y.n,k=nx.k+1;if(c>b.c||c===b.c&&k<b.k)b={c:c,k:k,p:[{i:i,...y}].concat(nx.p)}}
+const seg=(w)=>{const n=w.length,best=new Array(n+1).fill(null);best[n]={c:0,k:0,v:0,p:[]};
+  for(let i=n-1;i>=0;i--){let b={c:best[i+1].c,k:best[i+1].k,v:best[i+1].v,p:best[i+1].p};
+    /* v2.29: a final consonant right before ວ loses ties (ທີ່/ກວ້າງ, not ທີ່ກ/ວ້າງ) */
+    for(const y of at(w.slice(i))){const nx=best[i+y.n];if(!nx)continue;const c=nx.c+y.n,k=nx.k+1,v=nx.v+(y.fin&&w[i+y.n]==='ວ'?1:0);if(c>b.c||c===b.c&&(k<b.k||k===b.k&&v<b.v))b={c:c,k:k,v:v,p:[{i:i,...y}].concat(nx.p)}}
     best[i]=b}
   /* loanwords: leading cluster consonant (ກຣາມ, ຄລິກ) carries the class; a trailing ສ closes the syllable (ເຟສ) */
   const p=best[0].p;let e=0;for(const y of p){if(y.i>e&&y.ci===0&&/[ກຂຄຕທປຜພຝຟບດສ]/.test(w[y.i-1])&&'ຣລ'.includes(y.ini)){y.i--;y.n++;y.ini=w[y.i]}
@@ -262,6 +271,8 @@ function renderBundle(id){
   if(b.dl.length){const r0=b.dl[0][0];h+=`<div class="dlg"><div class="sechd"><span class="sec">짧은 대화</span><button class="speak all" data-playsec="1" aria-label="대화 전체 듣기">${RPT}<span>대화 반복</span></button></div>${b.dl.map((d,di)=>lineHTML(d[0]===r0?"g":"s",d[0],d[1],d[2],d[3],`dl-${id}-${di}`)).join("")}</div>`}
   if(b.sm&&b.sm[0])h+=`<div class="dlg smb"><span class="sec">한 문장에 모아 읽기</span>${lineHTML("n",null,b.sm[0],b.sm[1],b.sm[2],`sm-${id}`)}</div>`;
   {const rl=relOf(id);if(rl.length){const big=isBig();h+=`<div class="box rel"><h4>관련 묶음</h4><ul>${rl.map(x=>{const L=BLAB[x]||[B[x].t,""];return `<li><button class="rjump" data-goto="${x}"><span class="rn">[${x}]</span> ${esc(L[0])}${L[1]?` <span class="lo rlo">(${esc(L[1])})</span>`:""}</button></li>`}).join("")}</ul></div>`}}
+  /* v2.38 RYU: next-bundle button at the bottom (like the Korean app) */
+  h+=nextRow(id);
   return h+`</section>`;
 }
 function renderDlg(){
@@ -316,7 +327,7 @@ function render(){
   renderTop();showSel($("#groups"),'[aria-pressed="true"]');showSel($("#subs"),'[aria-selected="true"]');
   if(S.q.trim()){renderSearch();return}
   $("#controls").hidden=false;renderBand();
-  $("#view").innerHTML=S.mode==="cards"?renderCards():S.mode==="dlg"?renderDlg():renderQuiz();if(S.mode==="cards")fitBig();else if(S.mode==="dlg"){fitNotes();placeTones()}
+  $("#view").innerHTML=(S.mode==="cards"?renderCards():S.mode==="dlg"?renderDlg():renderQuiz())+(S.mode!=="dlg"?nextRow(S.bun[S.sub]||(SUBS[S.sub]||{b:[]}).b[0]):"");if(S.mode==="cards")fitBig();else if(S.mode==="dlg"){fitNotes();placeTones()}
   if(P.active&&P.queue[P.i])mark(P.queue[P.i].id);
   snapLater();
 }
@@ -337,6 +348,7 @@ document.addEventListener("click",e=>{
   if(document.documentElement.classList.contains("audwait")&&e.target.closest(".speak,.line,.card .face,[data-playcards],[data-playbundle],[data-sayall],[data-playsec]")){e.preventDefault();return}
   if(!e.target.closest("button,input,label,a,select")){const eh=e.target.closest(".entry-head");const ab=eh&&eh.querySelector("[data-sayall]");if(ab){ab.click();return}const ln=e.target.closest(".line");const sb=ln&&ln.querySelector("[data-say]");if(sb){sb.click();return}}
   const t=e.target.closest("button");if(!t)return;
+  if(t.matches(".speak.all"))P._bk=btnKey(t);else if(t.dataset.say!==undefined)P._bk=null;
   {const d=t.dataset;if((d.part||d.sub||d.goto||d.mode)&&P.active)stopPlay()}
   if(t.dataset.sayall){const en=t.closest(".entry");{const hid=en.querySelector(".entry-head").id,q0=P.queue&&P.queue[0];if(P.active&&!P.single&&q0&&q0.head&&q0.id===hid){stopPlay();return}}play([{text:t.dataset.say,rd:t.dataset.rd,id:en.querySelector(".entry-head").id,head:1},...[...en.querySelectorAll(".line")].map(sayItem)],false,2);return}
   if(t.dataset.playsec){const sec=t.closest(".pairs,.dlg");play([...sec.querySelectorAll(".line")].map(sayItem).filter(Boolean),true,1);return}
@@ -349,6 +361,7 @@ document.addEventListener("click",e=>{
   if(t.id==="ppause"){if(P.hold!=null)releaseHold();else setPaused(!P.paused);return}
   if(t.dataset.part){const p=PARTS.find(p=>p.id===t.dataset.part);S.part=p.id;{const ls=S.lastSub[p.id];S.sub=(ls&&p.subs.some(x=>x.id===ls))?ls:p.subs[0].id};S.q="";$("#q").value="";S.quiz=null;S.flipped={};save();render();return}
   if(t.dataset.sub){S.sub=t.dataset.sub;S.quiz=null;S.flipped={};save();render();return}
+  if(t.dataset.next){if(P.active)stopPlay();goto(t.dataset.next);try{const sh=document.getElementById("sheet");if(sh)sh.scrollIntoView({block:"start"})}catch(_){}return}
   if(t.dataset.goto){goto(t.dataset.goto);return}
   if(t.dataset.mode){S.mode=t.dataset.mode;S.quiz=null;save();render();return}
   if(t.dataset.qkind){S.qkind=t.dataset.qkind;render();return}
@@ -403,7 +416,7 @@ var st=document.createElement("style");st.textContent='html.cdd select.bsel{poin
 '.ddl button.ctr{justify-content:center;text-align:center;align-items:baseline;gap:0}.ddl .dlo{color:var(--muted);font-size:.82em;margin-left:.35em;font-weight:400}.ddl button.ctr[aria-selected=true] .dlo{color:inherit;opacity:.8}'+
 '.ddl button .ck{width:1em;flex:0 0 1em;color:var(--accent)}.ddl button[aria-selected=true]{background:var(--accent-soft,rgba(0,0,0,.06));font-weight:600}.ddl button.ctr{padding:.3em 1em;font-size:.86em;line-height:1.35}';
 document.head.appendChild(st);
-function close(){var a=document.querySelectorAll(".ddbg,.ddl");for(var i=0;i<a.length;i++)a[i].parentNode.removeChild(a[i])}
+function close(){document.querySelectorAll(".ddopen").forEach(function(x){x.classList.remove("ddopen")});var a=document.querySelectorAll(".ddbg,.ddl");for(var i=0;i<a.length;i++)a[i].parentNode.removeChild(a[i])}
 function open(sel){close();var r0=sel.getBoundingClientRect(),cs=getComputedStyle(sel),k=(sel.offsetWidth&&r0.width/sel.offsetWidth)||1,r={left:r0.left/k,top:r0.top/k,bottom:r0.bottom/k,width:r0.width/k};/* PC zoom: rect is in screen px, styles in css px */
   var bg=document.createElement("div");bg.className="ddbg";bg.onclick=close;
   var l=document.createElement("div");l.className="ddl";l.setAttribute("role","listbox");l.style.fontSize=cs.fontSize;l.style.fontFamily=cs.fontFamily;
@@ -413,13 +426,18 @@ function open(sel){close();var r0=sel.getBoundingClientRect(),cs=getComputedStyl
     b.onclick=function(){close();var v=o.value;/* v12.93: list may outlive its <select> (re-render during playback) */if(sel.id==="bsel"){var s=Object.values(SUBS).find(function(x){return x.b.indexOf(v)>=0});if(!s)return;if(S.sub===s.id&&S.bun[s.id]===v&&!P.active)return;if(P.active)stopPlay();S.part=s.part;S.sub=s.id;S.bun[s.id]=v;S.quiz=null;S.flipped={};save();render();return}var cur=(sel.id&&document.getElementById(sel.id))||sel;if(cur.value!==v){cur.value=v;cur.dispatchEvent(new Event("change",{bubbles:true}))}};l.appendChild(b)});
   document.body.appendChild(bg);document.body.appendChild(l);
   var vw=document.documentElement.clientWidth/k,vh=innerHeight/k,m=8;
-  var w=Math.min(vw-2*m,Math.max(r.width,l.scrollWidth+2));l.style.width=w+"px";
+  var big=sel.classList.contains("bigsel");/* v2.44 RYU: the bundle list hangs from its box as one piece (same left/right edges, no gap) */
+  var w=big?r.width:Math.min(vw-2*m,Math.max(r.width,l.scrollWidth+2));l.style.width=w+"px";if(big){l.classList.add("ddj");["--inv","--accent","--ink","--line"].forEach(function(v){var x=cs.getPropertyValue(v);if(x)l.style.setProperty(v,x)})}
   if(l.scrollWidth>w+1){l.querySelectorAll("button").forEach(function(b){b.style.whiteSpace="normal"})}
-  var left=Math.min(Math.max(m,r.left),vw-m-w);l.style.left=left+"px";
+  var left=big?r.left:Math.min(Math.max(m,r.left),vw-m-w);l.style.left=left+"px";
   var below=vh-r.bottom-m,above=r.top-m,h=l.scrollHeight;
-  if(h<=below||below>=above){l.style.top=(r.bottom+4)+"px";l.style.maxHeight=(below-4)+"px"}
+  if(big){var bh=Math.max(below-6,160);l.style.top=(r.bottom+6)+"px";l.style.maxHeight=bh+"px"}
+  else if(h<=below||below>=above){l.style.top=(r.bottom+4)+"px";l.style.maxHeight=(below-4)+"px"}
   else{var hh=Math.min(h,above-4);l.style.top=(r.top-4-hh)+"px";l.style.maxHeight=hh+"px"}
-  var cur=l.querySelector('[aria-selected=true]');if(cur&&cur.offsetTop>l.clientHeight-40)l.scrollTop=cur.offsetTop-l.clientHeight/2}
+  var cur=l.querySelector('[aria-selected=true]');if(cur&&cur.offsetTop>l.clientHeight-40)l.scrollTop=cur.offsetTop-l.clientHeight/2;
+  /* v2.43 RYU: the open list moves with its box when the page scrolls (phone) */
+  var t0=parseFloat(l.style.top),y0=r0.top;l._follow=function(){if(!l.parentNode)return;var el=(sel.id&&document.getElementById(sel.id))||sel,nr=el.getBoundingClientRect();if(!nr.height||nr.bottom<0||nr.top>innerHeight){close();return}l.style.top=(t0+(nr.top-y0)/k)+"px"}}
+addEventListener("scroll",function(){var l=document.querySelector(".ddl");if(l&&l._follow)l._follow()},{passive:true,capture:true});
 document.addEventListener("click",function(e){if(e.target.closest&&e.target.closest(".ddl,.ddbg"))return;
   var x=e.clientX,y=e.clientY,ss=document.querySelectorAll("select.bsel");
   for(var i=0;i<ss.length;i++){var r=ss[i].getBoundingClientRect();if(r.width&&x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){e.preventDefault();e.stopPropagation();open(ss[i]);return}}},true);
