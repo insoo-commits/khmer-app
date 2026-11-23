@@ -482,10 +482,11 @@ document.addEventListener("keydown",e=>{if(e.ctrlKey||e.metaKey||e.altKey)return
   if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();if(P.single||P.hold!=null)return;const tok=P.token;try{aud().pause()}catch(_){}P.k=0;P.rel=0;{const q=P.queue,c=q[Math.min(P.i,q.length-1)]||{},R=e.key==="ArrowRight";let j=-1;if(c.gi!=null&&!c.rv){const g=c.gi+(R?1:-1);j=q.findIndex(x=>x&&!x.rv&&x.gi===g);if(j<0&&R){j=q.findIndex((x,ix)=>ix>P.i&&x&&x.gi!==c.gi);if(j<0)j=q.length}if(j<0&&!R)j=q.findIndex(x=>x&&x.gi===c.gi)}if(j<0)j=R?P.i+1:Math.max(0,P.i-1);P.i=j}if(P.paused)setPaused(false);nextPlay(tok)}});
 
 /* v3.23 RYU: phone swipe left/right = next/previous bundle (same as the 다음 묶음/이전 묶음 buttons) */
+/* v2.22 RYU: 캄보디아·도움말 쪽의 정보 표(.facts) 위에서도 스와이프 */
 (function(){let sx=0,sy=0,st=0,ok=false;
  const hscroll=el=>{for(;el&&el!==document.body;el=el.parentElement){if(el.scrollWidth>el.clientWidth+4){const o=getComputedStyle(el).overflowX;if(o==="auto"||o==="scroll")return true}}return false};
  document.addEventListener("touchstart",e=>{ok=false;if(e.touches.length!==1)return;const t=e.touches[0],w=innerWidth;if(t.clientX<24||t.clientX>w-24)return;/* leave screen edges to the browser back/forward gesture */
-  const el=e.target;if(el.closest&&el.closest("input,select,textarea,#player,.gal,table,.bsel,#groups,#subs,.subs,.tabs"))return;if(hscroll(el))return;sx=t.clientX;sy=t.clientY;st=Date.now();ok=true},{passive:true});
+  const el=e.target;if(el.closest&&el.closest("input,select,textarea,#player,.gal,table:not(.facts),.bsel,#groups,#subs,.subs,.tabs"))return;if(hscroll(el))return;sx=t.clientX;sy=t.clientY;st=Date.now();ok=true},{passive:true});
  document.addEventListener("touchend",e=>{if(!ok)return;ok=false;const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
   if(Date.now()-st>700||Math.abs(dx)<80||Math.abs(dx)<Math.abs(dy)*2)return;try{const s=getSelection();if(s&&String(s).length)return}catch(_){}
   const b=document.querySelector(dx<0?".nextbun:not(.prevbun)":".nextbun.prevbun");if(!b)return;
