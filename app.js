@@ -482,13 +482,19 @@ document.addEventListener("keydown",e=>{if(e.ctrlKey||e.metaKey||e.altKey)return
   if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();if(P.single||P.hold!=null)return;const tok=P.token;try{aud().pause()}catch(_){}P.k=0;P.rel=0;{const q=P.queue,c=q[Math.min(P.i,q.length-1)]||{},R=e.key==="ArrowRight";let j=-1;if(c.gi!=null&&!c.rv){const g=c.gi+(R?1:-1);j=q.findIndex(x=>x&&!x.rv&&x.gi===g);if(j<0&&R){j=q.findIndex((x,ix)=>ix>P.i&&x&&x.gi!==c.gi);if(j<0)j=q.length}if(j<0&&!R)j=q.findIndex(x=>x&&x.gi===c.gi)}if(j<0)j=R?P.i+1:Math.max(0,P.i-1);P.i=j}if(P.paused)setPaused(false);nextPlay(tok)}});
 
 /* v3.23 RYU: phone swipe left/right = next/previous bundle (same as the 다음 묶음/이전 묶음 buttons) */
-/* v2.22 RYU: 캄보디아·도움말 쪽의 정보 표(.facts) 위에서도 스와이프 */
-(function(){let sx=0,sy=0,st=0,ok=false;
+/* v2.22 RYU: swipe also over info tables (.facts). v2.23 RYU: decide during touchmove (60px, 1 s, |dx|>1.5|dy|), vertical move >40px = scroll, one bundle per swipe, switch at once then slide in; a swipe never counts as a tap (sticky bundle-name bar no longer opens the list) */
+(function(){let sx=0,sy=0,st=0,ok=false,moved=false,swT=0;
  const hscroll=el=>{for(;el&&el!==document.body;el=el.parentElement){if(el.scrollWidth>el.clientWidth+4){const o=getComputedStyle(el).overflowX;if(o==="auto"||o==="scroll")return true}}return false};
- document.addEventListener("touchstart",e=>{ok=false;if(e.touches.length!==1)return;const t=e.touches[0],w=innerWidth;if(t.clientX<24||t.clientX>w-24)return;/* leave screen edges to the browser back/forward gesture */
-  const el=e.target;if(el.closest&&el.closest("input,select,textarea,#player,.gal,table:not(.facts),.bsel,#groups,#subs,.subs,.tabs"))return;if(hscroll(el))return;sx=t.clientX;sy=t.clientY;st=Date.now();ok=true},{passive:true});
- document.addEventListener("touchend",e=>{if(!ok)return;ok=false;const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
-  if(Date.now()-st>700||Math.abs(dx)<80||Math.abs(dx)<Math.abs(dy)*2)return;try{const s=getSelection();if(s&&String(s).length)return}catch(_){}
-  const b=document.querySelector(dx<0?".nextbun:not(.prevbun)":".nextbun.prevbun");if(!b)return;
-  const sh=document.getElementById("sheet");if(sh){sh.style.transition="transform .18s,opacity .18s";sh.style.transform="translateX("+(dx<0?-40:40)+"px)";sh.style.opacity=".3";
-   setTimeout(()=>{b.click();const s2=document.getElementById("sheet");if(s2){s2.style.transition="none";s2.style.transform="translateX("+(dx<0?40:-40)+"px)";s2.style.opacity=".3";requestAnimationFrame(()=>{s2.style.transition="transform .18s,opacity .18s";s2.style.transform="";s2.style.opacity=""})}},150)}else b.click()},{passive:true})})();
+ const go=dx=>{try{const s=getSelection();if(s&&String(s).length)return}catch(_){}
+  const b=document.querySelector(dx<0?".nextbun:not(.prevbun)":".nextbun.prevbun");if(!b)return;swT=Date.now();b.click();
+  const s2=document.getElementById("sheet");if(s2){s2.style.transition="none";s2.style.transform="translateX("+(dx<0?36:-36)+"px)";s2.style.opacity=".4";requestAnimationFrame(()=>requestAnimationFrame(()=>{s2.style.transition="transform .16s ease-out,opacity .16s";s2.style.transform="";s2.style.opacity=""}))}};
+ /* a finger that moved (swipe or scroll) is not a tap: swallow the click the browser may send afterwards */
+ document.addEventListener("click",e=>{if(e.isTrusted&&(moved||Date.now()-swT<500)){moved=false;e.preventDefault();e.stopPropagation()}},true);
+ document.addEventListener("touchstart",e=>{ok=false;moved=false;if(e.touches.length!==1)return;const t=e.touches[0],w=innerWidth;sx=t.clientX;sy=t.clientY;st=Date.now();if(t.clientX<24||t.clientX>w-24)return;/* leave screen edges to the browser back/forward gesture */
+  const el=e.target;if(el.closest&&el.closest("input,select,textarea,#player,.gal,table:not(.facts),.bsel,#groups,#subs,.subs,.tabs"))return;if(hscroll(el))return;ok=true},{passive:true});
+ const chk=t=>{if(!ok)return;const dx=t.clientX-sx,dy=t.clientY-sy;
+  if(Math.abs(dy)>40||Date.now()-st>1000){ok=false;return}
+  if(Math.abs(dx)>=60&&Math.abs(dx)>Math.abs(dy)*1.5){ok=false;go(dx)}};
+ document.addEventListener("touchmove",e=>{if(e.touches.length!==1)return;const t=e.touches[0];if(Math.abs(t.clientX-sx)>12||Math.abs(t.clientY-sy)>12)moved=true;if(ok)chk(t)},{passive:true});
+ document.addEventListener("touchend",e=>{if(ok)chk(e.changedTouches[0]);ok=false;setTimeout(()=>{moved=false},400)},{passive:true});
+ document.addEventListener("touchcancel",()=>{ok=false},{passive:true})})();
