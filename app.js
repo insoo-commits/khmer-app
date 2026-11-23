@@ -486,7 +486,7 @@ document.addEventListener("keydown",e=>{if(e.ctrlKey||e.metaKey||e.altKey)return
 (function(){let sx=0,sy=0,st=0,ok=false,moved=false,swT=0;
  const hscroll=el=>{for(;el&&el!==document.body;el=el.parentElement){if(el.scrollWidth>el.clientWidth+4){const o=getComputedStyle(el).overflowX;if(o==="auto"||o==="scroll")return true}}return false};
  const go=dx=>{try{const s=getSelection();if(s&&String(s).length)return}catch(_){}
-  const b=document.querySelector(dx<0?".nextbun:not(.prevbun)":".nextbun.prevbun");if(!b)return;swT=Date.now();b.click();
+  const b=document.querySelector(dx<0?".nextbun:not(.prevbun)":".nextbun.prevbun");if(!b)return;swT=Date.now();b.click();/* v2.25 RYU: after a swipe show the page from the very top (title), not the bundle-name bar */try{window.scrollTo({top:0,left:0,behavior:"instant"})}catch(_){window.scrollTo(0,0)}
   const s2=document.getElementById("sheet");if(s2){s2.style.transition="none";s2.style.transform="translateX("+(dx<0?36:-36)+"px)";s2.style.opacity=".4";requestAnimationFrame(()=>requestAnimationFrame(()=>{s2.style.transition="transform .16s ease-out,opacity .16s";s2.style.transform="";s2.style.opacity=""}))}};
  /* a finger that moved (swipe or scroll) is not a tap: swallow the click the browser may send afterwards */
  document.addEventListener("click",e=>{if(e.isTrusted&&(moved||Date.now()-swT<500)){moved=false;e.preventDefault();e.stopPropagation()}},true);
